@@ -219,11 +219,12 @@ namespace tcp_proxy
             try
             {
                session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
-
+               std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
                acceptor_.async_accept(session_->downstream_socket(),
                     boost::bind(&acceptor::handle_accept,
                          this,
                          boost::asio::placeholders::error));
+               std::cout << __FUNCTION__ << "Asynchronously accepted connections" << std::endl;
             }
             catch(std::exception& e)
             {
@@ -284,9 +285,9 @@ int main(int argc, char* argv[])
       tcp_proxy::bridge::acceptor acceptor(ios,
                                            local_host, local_port,
                                            forward_host, forward_port);
-
+      std::cout << "Created acceptor object" << std::endl;
       acceptor.accept_connections();
-
+      std::cout << "Acceptor- accepted connections" << std::endl;
       ios.run();
    }
    catch(std::exception& e)
