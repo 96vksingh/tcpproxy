@@ -9,18 +9,18 @@
 #
 
 
-COMPILER         = -c++
+COMPILER         = $(CXX)
 OPTIMIZATION_OPT = -O3
-OPTIONS          = -pedantic -ansi -Wall -Werror $(OPTIMIZATION_OPT) -o
+OPTIONS          = -pedantic -ansi -Wall -Werror $(OPTIMIZATION_OPT)
 PTHREAD          = -lpthread
-LINKER_OPT       = -L/usr/lib -lstdc++ $(PTHREAD) -lboost_thread -lboost_system
+LINKER_OPT       = -lstdc++ $(PTHREAD) -lboost_thread -lboost_system
 
 BUILD_LIST+=tcpproxy_server
 
 all: $(BUILD_LIST)
 
 tcpproxy_server: tcpproxy_server.cpp
-	$(COMPILER) $(OPTIONS) tcpproxy_server tcpproxy_server.cpp $(LINKER_OPT)
+	$(COMPILER) $(OPTIONS) $(EXTA_CFLAGS) -o tcpproxy_server tcpproxy_server.cpp $(LINKER_OPT)
 
 strip_bin :
 	strip -s tcpproxy
