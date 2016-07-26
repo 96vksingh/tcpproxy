@@ -11,7 +11,7 @@
 
 COMPILER         = $(CXX)
 OPTIMIZATION_OPT = -O3
-OPTIONS          = -pedantic -ansi -Wall -Werror $(OPTIMIZATION_OPT)
+OPTIONS          = -pedantic -ansi -Wall -Werror $(OPTIMIZATION_OPT) -g
 PTHREAD          = -lpthread
 LINKER_OPT       = -lstdc++ $(PTHREAD) -lboost_thread -lboost_system
 
