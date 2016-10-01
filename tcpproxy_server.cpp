@@ -211,7 +211,8 @@ namespace tcp_proxy
            localhost_address(boost::asio::ip::address_v4::from_string(local_host)),
            acceptor_(io_service_,ip::tcp::endpoint(localhost_address,local_port)),
            upstream_port_(upstream_port),
-           upstream_host_(upstream_host)
+           upstream_host_(upstream_host),
+           num_active_connections_(0)
          {}
 
          bool accept_connections()
@@ -241,6 +242,8 @@ namespace tcp_proxy
          {
             if (!error)
             {
+               num_active_connections_++;
+               std::cout << "Accepted connection " << num_active_connections_ << std::endl;
                session_->start(upstream_host_,upstream_port_);
 
                if (!accept_connections())
@@ -260,6 +263,7 @@ namespace tcp_proxy
          ptr_type session_;
          unsigned short upstream_port_;
          std::string upstream_host_;
+         uint64_t num_active_connections_;
       };
 
    };
