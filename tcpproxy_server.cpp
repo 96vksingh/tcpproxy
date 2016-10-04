@@ -62,7 +62,6 @@ namespace tcp_proxy
    public:
 
       typedef ip::tcp::socket socket_type;
-      typedef boost::shared_ptr<bridge> ptr_type;
 
       bridge(boost::asio::io_service& ios)
       : downstream_socket_(ios),
@@ -198,15 +197,16 @@ namespace tcp_proxy
 
       boost::mutex mutex_;
 
+   };
+
+   class acceptor
+   {
    public:
+      typedef boost::shared_ptr<bridge> ptr_type;
 
-      class acceptor
-      {
-      public:
-
-         acceptor(boost::asio::io_service& io_service,
-                  const std::string& local_host, unsigned short local_port,
-                  const std::string& upstream_host, unsigned short upstream_port)
+      acceptor(boost::asio::io_service& io_service,
+               const std::string& local_host, unsigned short local_port,
+               const std::string& upstream_host, unsigned short upstream_port)
          : io_service_(io_service),
            localhost_address(boost::asio::ip::address_v4::from_string(local_host)),
            acceptor_(io_service_,ip::tcp::endpoint(localhost_address,local_port)),
@@ -215,16 +215,16 @@ namespace tcp_proxy
            num_active_connections_(0)
          {}
 
-         bool accept_connections()
+      bool accept_connections()
          {
             try
             {
                session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
                std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
                acceptor_.async_accept(session_->downstream_socket(),
-                    boost::bind(&acceptor::handle_accept,
-                         this,
-                         boost::asio::placeholders::error));
+                                      boost::bind(&acceptor::handle_accept,
+                                                  this,
+                                                  boost::asio::placeholders::error));
                std::cout << __FUNCTION__ << "Asynchronously accepted connections" << std::endl;
             }
             catch(std::exception& e)
@@ -236,9 +236,9 @@ namespace tcp_proxy
             return true;
          }
 
-      private:
+   private:
 
-         void handle_accept(const boost::system::error_code& error)
+      void handle_accept(const boost::system::error_code& error)
          {
             if (!error)
             {
@@ -257,15 +257,13 @@ namespace tcp_proxy
             }
          }
 
-         boost::asio::io_service& io_service_;
-         ip::address_v4 localhost_address;
-         ip::tcp::acceptor acceptor_;
-         ptr_type session_;
-         unsigned short upstream_port_;
-         std::string upstream_host_;
-         uint64_t num_active_connections_;
-      };
-
+      boost::asio::io_service& io_service_;
+      ip::address_v4 localhost_address;
+      ip::tcp::acceptor acceptor_;
+      ptr_type session_;
+      unsigned short upstream_port_;
+      std::string upstream_host_;
+      uint64_t num_active_connections_;
    };
 }
 
@@ -286,9 +284,9 @@ int main(int argc, char* argv[])
 
    try
    {
-      tcp_proxy::bridge::acceptor acceptor(ios,
-                                           local_host, local_port,
-                                           forward_host, forward_port);
+      tcp_proxy::acceptor acceptor(ios,
+                                   local_host, local_port,
+                                   forward_host, forward_port);
       std::cout << "Created acceptor object" << std::endl;
       acceptor.accept_connections();
       std::cout << "Acceptor- accepted connections" << std::endl;
