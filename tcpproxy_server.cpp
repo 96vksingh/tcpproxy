@@ -122,9 +122,10 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
                      &bridge_ptr_->ssplice_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
+   } else {
+      std::cerr << "Exception:" << error.message() << std::endl;
+      bridge_ptr_->close();
    }
-   else
-      close();
 }
 void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_code& error)
 {
@@ -137,9 +138,10 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
                      &bridge_ptr_->ssplice_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
+   } else {
+      std::cerr << "Exception:" << error.message() << std::endl;
+      bridge_ptr_->close();
    }
-   else
-      close();
 }
 
 void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_code& error,
@@ -153,9 +155,10 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
                   boost::bind(&server_splice::handle_downstream_write,
                               &bridge_ptr_->ssplice_,
                               boost::asio::placeholders::error));
+   } else {
+      std::cerr << "Exception:" << error.message() << std::endl;
+      bridge_ptr_->close();
    }
-   else
-      close();
 }
 
 void tcp_proxy::client_splice::close()
@@ -191,9 +194,10 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
                      &bridge_ptr_->csplice_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
+   } else {
+      std::cerr << "Exception:" << error.message() << std::endl;
+      bridge_ptr_->close();
    }
-   else
-      close();
 }
 
 void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error_code& error,
@@ -207,9 +211,10 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
                   boost::bind(&client_splice::handle_upstream_write,
                               &bridge_ptr_->csplice_,
                               boost::asio::placeholders::error));
+   } else {
+      std::cerr << "Exception:" << error.message() << std::endl;
+      bridge_ptr_->close();
    }
-   else
-      close();
 }
 
 void tcp_proxy::server_splice::close()
