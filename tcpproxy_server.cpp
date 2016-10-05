@@ -60,16 +60,20 @@ using namespace tcp_proxy;
 tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
    :csplice_(ios),
     ssplice_(ios)
-{}
+{
+   std::cout << "In " << __FUNCTION__ << std::endl;
+}
 
 void tcp_proxy::bridge::init()
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    csplice_.set_bridge(this);
    ssplice_.set_bridge(this);
 }
 
 void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short upstream_port)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    csplice_.upstream_socket_.async_connect(
       ip::tcp::endpoint(
          boost::asio::ip::address::from_string(upstream_host),
@@ -81,6 +85,7 @@ void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short u
 
 void tcp_proxy::bridge::close()
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    boost::mutex::scoped_lock lock(mutex_);
    ssplice_.close();
    csplice_.close();
@@ -89,15 +94,19 @@ void tcp_proxy::bridge::close()
 tcp_proxy::client_splice::client_splice(boost::asio::io_service& ios)
    :upstream_socket_(ios),
     bridge_ptr_(NULL)
-{}
+{
+   std::cout << "In " << __FUNCTION__ << std::endl;
+}
 
 void tcp_proxy::client_splice::set_bridge(bridge *bptr)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    bridge_ptr_ = bptr;
 }
 
 void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::error_code& error)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       upstream_socket_.async_read_some(
@@ -119,6 +128,7 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
 }
 void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_code& error)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       bridge_ptr_->ssplice_.downstream_socket_.async_read_some(
@@ -135,6 +145,7 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
 void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_code& error,
                                                     const size_t& bytes_transferred)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       async_write(bridge_ptr_->ssplice_.downstream_socket_,
@@ -149,6 +160,7 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
 
 void tcp_proxy::client_splice::close()
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    boost::mutex::scoped_lock lock(mutex_);
    if (upstream_socket_.is_open())
    {
@@ -158,15 +170,19 @@ void tcp_proxy::client_splice::close()
 
 tcp_proxy::server_splice::server_splice(boost::asio::io_service& ios)
    :downstream_socket_(ios)
-{}
+{
+   std::cout << "In " << __FUNCTION__ << std::endl;
+}
 
 void tcp_proxy::server_splice::set_bridge(bridge *bptr)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    bridge_ptr_ = bptr;
 }
 
 void tcp_proxy::server_splice::handle_downstream_write(const boost::system::error_code& error)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       bridge_ptr_->csplice_.upstream_socket_.async_read_some(
@@ -183,6 +199,7 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
 void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error_code& error,
                                                       const size_t& bytes_transferred)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       async_write(bridge_ptr_->csplice_.upstream_socket_,
@@ -197,6 +214,8 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
 
 void tcp_proxy::server_splice::close()
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
+
    boost::mutex::scoped_lock lock(mutex_);
 
    if (downstream_socket_.is_open())
@@ -215,10 +234,14 @@ tcp_proxy::acceptor::acceptor(boost::asio::io_service& io_service,
      upstream_port_(upstream_port),
      upstream_host_(upstream_host),
      num_active_connections_(0)
-{}
+{
+   std::cout << "In " << __FUNCTION__ << std::endl;
+}
 
 bool tcp_proxy::acceptor::accept_connections()
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
+
    try
    {
       session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
@@ -241,6 +264,7 @@ bool tcp_proxy::acceptor::accept_connections()
 
 void tcp_proxy::acceptor::handle_accept(const boost::system::error_code& error)
 {
+   std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       num_active_connections_++;
