@@ -26,4 +26,4 @@ strip_bin :
 	strip -s tcpproxy
 
 clean:
-	rm -f core *.o *.bak *~ *stackdump *#
+	rm -f tcpproxy_server core *.o *.bak *~ *stackdump *#

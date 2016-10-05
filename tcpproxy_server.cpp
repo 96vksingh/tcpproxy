@@ -51,220 +51,211 @@
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread/mutex.hpp>
+#include "tcpproxy_server.h"
 
+namespace ip = boost::asio::ip;
+typedef ip::tcp::socket socket_type;
+using namespace tcp_proxy;
 
-namespace tcp_proxy
+tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
+   :csplice_(ios),
+    ssplice_(ios)
+{}
+
+void tcp_proxy::bridge::init()
 {
-   namespace ip = boost::asio::ip;
+   csplice_.set_bridge(this);
+   ssplice_.set_bridge(this);
+}
 
-   class bridge : public boost::enable_shared_from_this<bridge>
+void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short upstream_port)
+{
+   csplice_.upstream_socket_.async_connect(
+      ip::tcp::endpoint(
+         boost::asio::ip::address::from_string(upstream_host),
+         upstream_port),
+      boost::bind(&client_splice::handle_upstream_connect,
+                  &csplice_,
+                  boost::asio::placeholders::error));
+}
+
+void tcp_proxy::bridge::close()
+{
+   boost::mutex::scoped_lock lock(mutex_);
+   ssplice_.close();
+   csplice_.close();
+}
+
+tcp_proxy::client_splice::client_splice(boost::asio::io_service& ios)
+   :upstream_socket_(ios),
+    bridge_ptr_(NULL)
+{}
+
+void tcp_proxy::client_splice::set_bridge(bridge *bptr)
+{
+   bridge_ptr_ = bptr;
+}
+
+void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::error_code& error)
+{
+   if (!error)
    {
-   public:
+      upstream_socket_.async_read_some(
+         boost::asio::buffer(upstream_data_,max_data_length),
+         boost::bind(&client_splice::handle_upstream_read,
+                     this,
+                     boost::asio::placeholders::error,
+                     boost::asio::placeholders::bytes_transferred));
 
-      typedef ip::tcp::socket socket_type;
+      bridge_ptr_->ssplice_.downstream_socket_.async_read_some(
+         boost::asio::buffer(bridge_ptr_->ssplice_.downstream_data_,max_data_length),
+         boost::bind(&server_splice::handle_downstream_read,
+                     &bridge_ptr_->ssplice_,
+                     boost::asio::placeholders::error,
+                     boost::asio::placeholders::bytes_transferred));
+   }
+   else
+      close();
+}
+void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_code& error)
+{
+   if (!error)
+   {
+      bridge_ptr_->ssplice_.downstream_socket_.async_read_some(
+         boost::asio::buffer(bridge_ptr_->ssplice_.downstream_data_,max_data_length),
+         boost::bind(&server_splice::handle_downstream_read,
+                     &bridge_ptr_->ssplice_,
+                     boost::asio::placeholders::error,
+                     boost::asio::placeholders::bytes_transferred));
+   }
+   else
+      close();
+}
 
-      bridge(boost::asio::io_service& ios)
-      : downstream_socket_(ios),
-        upstream_socket_(ios)
-      {}
+void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_code& error,
+                                                    const size_t& bytes_transferred)
+{
+   if (!error)
+   {
+      async_write(bridge_ptr_->ssplice_.downstream_socket_,
+                  boost::asio::buffer(upstream_data_,bytes_transferred),
+                  boost::bind(&server_splice::handle_downstream_write,
+                              &bridge_ptr_->ssplice_,
+                              boost::asio::placeholders::error));
+   }
+   else
+      close();
+}
 
-      socket_type& downstream_socket()
-      {
-         return downstream_socket_;
-      }
+void tcp_proxy::client_splice::close()
+{
+   boost::mutex::scoped_lock lock(mutex_);
+   if (upstream_socket_.is_open())
+   {
+      upstream_socket_.close();
+   }
+}
 
-      socket_type& upstream_socket()
-      {
-         return upstream_socket_;
-      }
+tcp_proxy::server_splice::server_splice(boost::asio::io_service& ios)
+   :downstream_socket_(ios)
+{}
 
-      void start(const std::string& upstream_host, unsigned short upstream_port)
-      {
-         upstream_socket_.async_connect(
-              ip::tcp::endpoint(
-                   boost::asio::ip::address::from_string(upstream_host),
-                   upstream_port),
-               boost::bind(&bridge::handle_upstream_connect,
-                    shared_from_this(),
-                    boost::asio::placeholders::error));
-      }
+void tcp_proxy::server_splice::set_bridge(bridge *bptr)
+{
+   bridge_ptr_ = bptr;
+}
 
-      void handle_upstream_connect(const boost::system::error_code& error)
-      {
-         if (!error)
-         {
-            upstream_socket_.async_read_some(
-                 boost::asio::buffer(upstream_data_,max_data_length),
-                 boost::bind(&bridge::handle_upstream_read,
-                      shared_from_this(),
-                      boost::asio::placeholders::error,
-                      boost::asio::placeholders::bytes_transferred));
+void tcp_proxy::server_splice::handle_downstream_write(const boost::system::error_code& error)
+{
+   if (!error)
+   {
+      bridge_ptr_->csplice_.upstream_socket_.async_read_some(
+         boost::asio::buffer(bridge_ptr_->csplice_.upstream_data_,max_data_length),
+         boost::bind(&client_splice::handle_upstream_read,
+                     &bridge_ptr_->csplice_,
+                     boost::asio::placeholders::error,
+                     boost::asio::placeholders::bytes_transferred));
+   }
+   else
+      close();
+}
 
-            downstream_socket_.async_read_some(
-                 boost::asio::buffer(downstream_data_,max_data_length),
-                 boost::bind(&bridge::handle_downstream_read,
-                      shared_from_this(),
-                      boost::asio::placeholders::error,
-                      boost::asio::placeholders::bytes_transferred));
-         }
-         else
-            close();
-      }
-
-   private:
-
-      void handle_downstream_write(const boost::system::error_code& error)
-      {
-         if (!error)
-         {
-            upstream_socket_.async_read_some(
-                 boost::asio::buffer(upstream_data_,max_data_length),
-                 boost::bind(&bridge::handle_upstream_read,
-                      shared_from_this(),
-                      boost::asio::placeholders::error,
-                      boost::asio::placeholders::bytes_transferred));
-         }
-         else
-            close();
-      }
-
-      void handle_downstream_read(const boost::system::error_code& error,
-                                  const size_t& bytes_transferred)
-      {
-         if (!error)
-         {
-            async_write(upstream_socket_,
+void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error_code& error,
+                                                      const size_t& bytes_transferred)
+{
+   if (!error)
+   {
+      async_write(bridge_ptr_->csplice_.upstream_socket_,
                   boost::asio::buffer(downstream_data_,bytes_transferred),
-                  boost::bind(&bridge::handle_upstream_write,
-                        shared_from_this(),
-                        boost::asio::placeholders::error));
-         }
-         else
-            close();
-      }
+                  boost::bind(&client_splice::handle_upstream_write,
+                              &bridge_ptr_->csplice_,
+                              boost::asio::placeholders::error));
+   }
+   else
+      close();
+}
 
-      void handle_upstream_write(const boost::system::error_code& error)
-      {
-         if (!error)
-         {
-            downstream_socket_.async_read_some(
-                 boost::asio::buffer(downstream_data_,max_data_length),
-                 boost::bind(&bridge::handle_downstream_read,
-                      shared_from_this(),
-                      boost::asio::placeholders::error,
-                      boost::asio::placeholders::bytes_transferred));
-         }
-         else
-            close();
-      }
+void tcp_proxy::server_splice::close()
+{
+   boost::mutex::scoped_lock lock(mutex_);
 
-      void handle_upstream_read(const boost::system::error_code& error,
-                                const size_t& bytes_transferred)
-      {
-         if (!error)
-         {
-            async_write(downstream_socket_,
-                 boost::asio::buffer(upstream_data_,bytes_transferred),
-                 boost::bind(&bridge::handle_downstream_write,
-                      shared_from_this(),
-                      boost::asio::placeholders::error));
-         }
-         else
-            close();
-      }
-
-      void close()
-      {
-         boost::mutex::scoped_lock lock(mutex_);
-
-         if (downstream_socket_.is_open())
-         {
-            downstream_socket_.close();
-         }
-
-         if (upstream_socket_.is_open())
-         {
-            upstream_socket_.close();
-         }
-      }
-
-      socket_type downstream_socket_;
-      socket_type upstream_socket_;
-
-      enum { max_data_length = 8192 }; //8KB
-      unsigned char downstream_data_[max_data_length];
-      unsigned char upstream_data_[max_data_length];
-
-      boost::mutex mutex_;
-
-   };
-
-   class acceptor
+   if (downstream_socket_.is_open())
    {
-   public:
-      typedef boost::shared_ptr<bridge> ptr_type;
+      downstream_socket_.close();
+   }
+}
 
-      acceptor(boost::asio::io_service& io_service,
-               const std::string& local_host, unsigned short local_port,
-               const std::string& upstream_host, unsigned short upstream_port)
-         : io_service_(io_service),
-           localhost_address(boost::asio::ip::address_v4::from_string(local_host)),
-           acceptor_(io_service_,ip::tcp::endpoint(localhost_address,local_port)),
-           upstream_port_(upstream_port),
-           upstream_host_(upstream_host),
-           num_active_connections_(0)
-         {}
+typedef boost::shared_ptr<bridge> ptr_type;
+tcp_proxy::acceptor::acceptor(boost::asio::io_service& io_service,
+                              const std::string& local_host, unsigned short local_port,
+                              const std::string& upstream_host, unsigned short upstream_port)
+   : io_service_(io_service),
+     localhost_address(boost::asio::ip::address_v4::from_string(local_host)),
+     acceptor_(io_service_,ip::tcp::endpoint(localhost_address,local_port)),
+     upstream_port_(upstream_port),
+     upstream_host_(upstream_host),
+     num_active_connections_(0)
+{}
 
-      bool accept_connections()
-         {
-            try
-            {
-               session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
-               std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
-               acceptor_.async_accept(session_->downstream_socket(),
-                                      boost::bind(&acceptor::handle_accept,
-                                                  this,
-                                                  boost::asio::placeholders::error));
-               std::cout << __FUNCTION__ << "Asynchronously accepted connections" << std::endl;
-            }
-            catch(std::exception& e)
-            {
-               std::cerr << "acceptor exception: " << e.what() << std::endl;
-               return false;
-            }
+bool tcp_proxy::acceptor::accept_connections()
+{
+   try
+   {
+      session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
+      session_->init();
+      std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
+      acceptor_.async_accept(session_->ssplice_.downstream_socket_,
+                             boost::bind(&acceptor::handle_accept,
+                                         this,
+                                         boost::asio::placeholders::error));
+      std::cout << __FUNCTION__ << "Asynchronously accepted connections" << std::endl;
+   }
+   catch(std::exception& e)
+   {
+      std::cerr << "acceptor exception: " << e.what() << std::endl;
+      return false;
+   }
 
-            return true;
-         }
+   return true;
+}
 
-   private:
+void tcp_proxy::acceptor::handle_accept(const boost::system::error_code& error)
+{
+   if (!error)
+   {
+      num_active_connections_++;
+      std::cout << "Accepted connection " << num_active_connections_ << std::endl;
+      session_->start(upstream_host_,upstream_port_);
 
-      void handle_accept(const boost::system::error_code& error)
-         {
-            if (!error)
-            {
-               num_active_connections_++;
-               std::cout << "Accepted connection " << num_active_connections_ << std::endl;
-               session_->start(upstream_host_,upstream_port_);
-
-               if (!accept_connections())
-               {
-                  std::cerr << "Failure during call to accept." << std::endl;
-               }
-            }
-            else
-            {
-               std::cerr << "Error: " << error.message() << std::endl;
-            }
-         }
-
-      boost::asio::io_service& io_service_;
-      ip::address_v4 localhost_address;
-      ip::tcp::acceptor acceptor_;
-      ptr_type session_;
-      unsigned short upstream_port_;
-      std::string upstream_host_;
-      uint64_t num_active_connections_;
-   };
+      if (!accept_connections())
+      {
+         std::cerr << "Failure during call to accept." << std::endl;
+      }
+   }
+   else
+   {
+      std::cerr << "Error: " << error.message() << std::endl;
+   }
 }
 
 int main(int argc, char* argv[])
