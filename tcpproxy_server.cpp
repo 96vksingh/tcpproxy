@@ -58,28 +58,29 @@ typedef ip::tcp::socket socket_type;
 using namespace tcp_proxy;
 
 tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
-   :csplice_(ios),
-    ssplice_(ios)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
+   csplice_ptr_ = boost::shared_ptr<client_splice>(new client_splice(ios));
+   ssplice_ptr_ = boost::shared_ptr<server_splice>(new server_splice(ios));
+   std::cout << "inited client and server splice " << __FUNCTION__ << std::endl;
 }
 
 void tcp_proxy::bridge::init()
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
-   csplice_.set_bridge(this);
-   ssplice_.set_bridge(this);
+   csplice_ptr_->set_bridge(this);
+   ssplice_ptr_->set_bridge(this);
 }
 
 void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short upstream_port)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
-   csplice_.upstream_socket_.async_connect(
+   csplice_ptr_->upstream_socket_.async_connect(
       ip::tcp::endpoint(
          boost::asio::ip::address::from_string(upstream_host),
          upstream_port),
       boost::bind(&client_splice::handle_upstream_connect,
-                  csplice_.shared_from_this(),
+                  csplice_ptr_->shared_from_this(),
                   boost::asio::placeholders::error));
 }
 
@@ -87,8 +88,8 @@ void tcp_proxy::bridge::close()
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
    boost::mutex::scoped_lock lock(mutex_);
-   ssplice_.close();
-   csplice_.close();
+   ssplice_ptr_->close();
+   csplice_ptr_->close();
 }
 
 tcp_proxy::client_splice::client_splice(boost::asio::io_service& ios)
@@ -116,10 +117,10 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
 
-      bridge_ptr_->ssplice_.downstream_socket_.async_read_some(
-         boost::asio::buffer(bridge_ptr_->ssplice_.downstream_data_,max_data_length),
+      bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
+         boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     bridge_ptr_->ssplice_.shared_from_this(),
+                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
@@ -132,10 +133,10 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      bridge_ptr_->ssplice_.downstream_socket_.async_read_some(
-         boost::asio::buffer(bridge_ptr_->ssplice_.downstream_data_,max_data_length),
+      bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
+         boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     &bridge_ptr_->ssplice_,
+                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
@@ -150,10 +151,10 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      async_write(bridge_ptr_->ssplice_.downstream_socket_,
+      async_write(bridge_ptr_->ssplice_ptr_->downstream_socket_,
                   boost::asio::buffer(upstream_data_,bytes_transferred),
                   boost::bind(&server_splice::handle_downstream_write,
-                              &bridge_ptr_->ssplice_,
+                              bridge_ptr_->ssplice_ptr_->shared_from_this(),
                               boost::asio::placeholders::error));
    } else {
       std::cerr << "Exception:" << error.message() << std::endl;
@@ -188,10 +189,10 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      bridge_ptr_->csplice_.upstream_socket_.async_read_some(
-         boost::asio::buffer(bridge_ptr_->csplice_.upstream_data_,max_data_length),
+      bridge_ptr_->csplice_ptr_->upstream_socket_.async_read_some(
+         boost::asio::buffer(bridge_ptr_->csplice_ptr_->upstream_data_,max_data_length),
          boost::bind(&client_splice::handle_upstream_read,
-                     bridge_ptr_->csplice_.shared_from_this(),
+                     bridge_ptr_->csplice_ptr_->shared_from_this(),
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
@@ -206,10 +207,10 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      async_write(bridge_ptr_->csplice_.upstream_socket_,
+      async_write(bridge_ptr_->csplice_ptr_->upstream_socket_,
                   boost::asio::buffer(downstream_data_,bytes_transferred),
                   boost::bind(&client_splice::handle_upstream_write,
-                              bridge_ptr_->csplice_.shared_from_this(),
+                              bridge_ptr_->csplice_ptr_->shared_from_this(),
                               boost::asio::placeholders::error));
    } else {
       std::cerr << "Exception:" << error.message() << std::endl;
@@ -252,7 +253,7 @@ bool tcp_proxy::acceptor::accept_connections()
       session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
       session_->init();
       std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
-      acceptor_.async_accept(session_->ssplice_.downstream_socket_,
+      acceptor_.async_accept(session_->ssplice_ptr_->downstream_socket_,
                              boost::bind(&acceptor::handle_accept,
                                          this,
                                          boost::asio::placeholders::error));

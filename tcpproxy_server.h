@@ -56,8 +56,8 @@ namespace tcp_proxy
        void init();
        void start(const std::string& upstream_host, unsigned short upstream_port);
        void close();
-       client_splice csplice_;
-       server_splice ssplice_;
+       boost::shared_ptr<client_splice> csplice_ptr_;
+       boost::shared_ptr<server_splice> ssplice_ptr_;
        enum { max_data_length = 8192 }; //8KB
        unsigned char downstream_data_[max_data_length];
        unsigned char upstream_data_[max_data_length];
@@ -67,7 +67,7 @@ namespace tcp_proxy
    class acceptor
    {
    public:
-      typedef boost::shared_ptr<bridge> ptr_type;
+       typedef boost::shared_ptr<bridge> ptr_type;
       acceptor(boost::asio::io_service& io_service,
                const std::string& local_host, unsigned short local_port,
                const std::string& upstream_host, unsigned short upstream_port);
