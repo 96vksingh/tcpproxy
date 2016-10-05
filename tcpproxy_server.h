@@ -16,7 +16,7 @@ namespace tcp_proxy
    typedef ip::tcp::socket socket_type;
 
    class bridge;
-   class client_splice
+   class client_splice : public boost::enable_shared_from_this<client_splice>
    {
    public :
        client_splice(boost::asio::io_service& ios);
@@ -33,7 +33,7 @@ namespace tcp_proxy
        boost::mutex mutex_;
    };
 
-   class server_splice
+   class server_splice : public boost::enable_shared_from_this<server_splice>
    {
    public:
        server_splice(boost::asio::io_service& ios);
