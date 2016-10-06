@@ -80,7 +80,7 @@ void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short u
          boost::asio::ip::address::from_string(upstream_host),
          upstream_port),
       boost::bind(&client_splice::handle_upstream_connect,
-                  csplice_ptr_->shared_from_this(),
+                  csplice_ptr_,
                   boost::asio::placeholders::error));
 }
 
@@ -113,14 +113,14 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
       upstream_socket_.async_read_some(
          boost::asio::buffer(upstream_data_,max_data_length),
          boost::bind(&client_splice::handle_upstream_read,
-                     shared_from_this(),
+                     this,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
 
       bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
          boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                     bridge_ptr_->ssplice_ptr_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
@@ -136,7 +136,7 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
       bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
          boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                     bridge_ptr_->ssplice_ptr_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
@@ -154,7 +154,7 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
       async_write(bridge_ptr_->ssplice_ptr_->downstream_socket_,
                   boost::asio::buffer(upstream_data_,bytes_transferred),
                   boost::bind(&server_splice::handle_downstream_write,
-                              bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                              bridge_ptr_->ssplice_ptr_,
                               boost::asio::placeholders::error));
    } else {
       std::cerr << "Exception:" << error.message() << std::endl;
@@ -192,7 +192,7 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
       bridge_ptr_->csplice_ptr_->upstream_socket_.async_read_some(
          boost::asio::buffer(bridge_ptr_->csplice_ptr_->upstream_data_,max_data_length),
          boost::bind(&client_splice::handle_upstream_read,
-                     bridge_ptr_->csplice_ptr_->shared_from_this(),
+                     bridge_ptr_->csplice_ptr_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
@@ -210,7 +210,7 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
       async_write(bridge_ptr_->csplice_ptr_->upstream_socket_,
                   boost::asio::buffer(downstream_data_,bytes_transferred),
                   boost::bind(&client_splice::handle_upstream_write,
-                              bridge_ptr_->csplice_ptr_->shared_from_this(),
+                              bridge_ptr_->csplice_ptr_,
                               boost::asio::placeholders::error));
    } else {
       std::cerr << "Exception:" << error.message() << std::endl;
