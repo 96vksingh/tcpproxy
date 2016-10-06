@@ -14,7 +14,6 @@ namespace tcp_proxy
 {
    namespace ip = boost::asio::ip;
    typedef ip::tcp::socket socket_type;
-
    class bridge;
    class client_splice : public boost::enable_shared_from_this<client_splice>
    {
@@ -79,8 +78,11 @@ namespace tcp_proxy
       ip::address_v4 localhost_address;
       ip::tcp::acceptor acceptor_;
       ptr_type session_;
+      std::vector<ptr_type> sessions_;
       unsigned short upstream_port_;
       std::string upstream_host_;
       uint64_t num_active_connections_;
    };
+   std::vector<boost::shared_ptr<client_splice> > csplices_;
+   std::vector<boost::shared_ptr<server_splice> > ssplices_;
 }
