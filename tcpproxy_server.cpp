@@ -120,7 +120,7 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
       bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
          boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                     bridge_ptr_->ssplice_ptr_,
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
