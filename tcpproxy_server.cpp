@@ -63,8 +63,6 @@ tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
    csplice_ptr_ = boost::shared_ptr<client_splice>(new client_splice(ios));
    ssplice_ptr_ = boost::shared_ptr<server_splice>(new server_splice(ios));
    std::cout << "inited client and server splice " << __FUNCTION__ << std::endl;
-   csplices_.push_back(csplice_ptr_);
-   ssplices_.push_back(ssplice_ptr_);
 }
 
 void tcp_proxy::bridge::init()
@@ -253,7 +251,6 @@ bool tcp_proxy::acceptor::accept_connections()
    try
    {
       session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
-      sessions_.push_back(session_);
       session_->init();
       std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
       acceptor_.async_accept(session_->ssplice_ptr_->downstream_socket_,
