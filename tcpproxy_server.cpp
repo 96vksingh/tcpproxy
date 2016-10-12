@@ -51,6 +51,7 @@
 #include <boost/bind.hpp>
 #include <boost/asio.hpp>
 #include <boost/thread/mutex.hpp>
+#include <boost/lexical_cast.hpp>
 #include "tcpproxy_server.h"
 
 namespace ip = boost::asio::ip;
@@ -60,10 +61,11 @@ using namespace tcp_proxy;
 //std::vector<boost::shared_ptr<tcp_proxy::bridge> > tcp_proxy::bridge_instances = std::vector<boost::shared_ptr<tcp_proxy::bridge> >();
 // uint64_t tcp_proxy::num_client_connections_ = 0;
 // uint64_t tcp_proxy::num_server_connections_ = 0;
-
+bool debug = false;
 tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    csplice_ptr_ = boost::shared_ptr<client_splice>(new client_splice(ios));
    ssplice_ptr_ = boost::shared_ptr<server_splice>(new server_splice(ios));
     std::cout << "inited client and server splice " << __FUNCTION__ << std::endl;
@@ -72,14 +74,16 @@ tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
 void tcp_proxy::bridge::init(boost::shared_ptr<bridge> bp)
 {
    boost::weak_ptr<bridge> wbp = bp;
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    csplice_ptr_->set_bridge(wbp);
    ssplice_ptr_->set_bridge(wbp);
 }
 
 void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short upstream_port)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    csplice_ptr_->upstream_socket_.async_connect(
       ip::tcp::endpoint(
          boost::asio::ip::address::from_string(upstream_host),
@@ -91,7 +95,8 @@ void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short u
 
 void tcp_proxy::bridge::close()
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    boost::mutex::scoped_lock lock(mutex_);
    ssplice_ptr_->close();
    csplice_ptr_->close();
@@ -109,25 +114,29 @@ void tcp_proxy::bridge::close()
 tcp_proxy::client_splice::client_splice(boost::asio::io_service& ios)
    :upstream_socket_(ios)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
 }
 
 void tcp_proxy::client_splice::set_bridge(boost::weak_ptr<bridge> wbp)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    wbp_ = wbp;
 }
 
 void tcp_proxy::client_splice::set_ss(boost::weak_ptr<server_splice> wssp)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    wssp_ = wssp;
 }
 
 
 void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::error_code& error)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    num_client_connections_++;
    std::cout << "Client Conn. " << num_client_connections_ << std::endl;
    boost::shared_ptr<bridge> bp = wbp_.lock();
@@ -158,7 +167,8 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
 }
 void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_code& error)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       boost::shared_ptr<server_splice> ssp = wssp_.lock();
@@ -179,7 +189,8 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
 void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_code& error,
                                                     const size_t& bytes_transferred)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       boost::shared_ptr<server_splice> ssp = wssp_.lock();
@@ -198,7 +209,8 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
 
 void tcp_proxy::client_splice::close()
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    boost::mutex::scoped_lock lock(mutex_);
    if (upstream_socket_.is_open())
    {
@@ -209,24 +221,28 @@ void tcp_proxy::client_splice::close()
 tcp_proxy::server_splice::server_splice(boost::asio::io_service& ios)
    :downstream_socket_(ios)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
 }
 
 void tcp_proxy::server_splice::set_bridge(boost::weak_ptr<bridge> wbp)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    wbp_ = wbp;
 }
 
 void tcp_proxy::server_splice::set_cs(boost::weak_ptr<client_splice> wcsp)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    wcsp_ = wcsp;
 }
 
 void tcp_proxy::server_splice::handle_downstream_write(const boost::system::error_code& error)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       boost::shared_ptr<client_splice> csp = wcsp_.lock();
@@ -247,7 +263,8 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
 void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error_code& error,
                                                       const size_t& bytes_transferred)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       boost::shared_ptr<client_splice> csp = wcsp_.lock();
@@ -266,7 +283,8 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
 
 void tcp_proxy::server_splice::close()
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
 
    boost::mutex::scoped_lock lock(mutex_);
 
@@ -286,12 +304,14 @@ tcp_proxy::acceptor::acceptor(boost::asio::io_service& io_service,
      upstream_port_(upstream_port),
      upstream_host_(upstream_host)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
 }
 
 bool tcp_proxy::acceptor::accept_connections()
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
 
    try
    {
@@ -317,7 +337,8 @@ bool tcp_proxy::acceptor::accept_connections()
 
 void tcp_proxy::acceptor::handle_accept(const boost::system::error_code& error)
 {
-   std::cout << "In " << __FUNCTION__ << std::endl;
+   if(debug)
+      std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
       boost::shared_ptr<bridge> bp = session_.lock();
@@ -338,9 +359,9 @@ void tcp_proxy::acceptor::handle_accept(const boost::system::error_code& error)
 
 int main(int argc, char* argv[])
 {
-   if (argc != 5)
+   if (argc != 6)
    {
-      std::cerr << "usage: tcpproxy_server <local host ip> <local port> <forward host ip> <forward port>" << std::endl;
+      std::cerr << "usage: tcpproxy_server <local host ip> <local port> <forward host ip> <forward port> <debug 0(false)/1(true)>" << std::endl;
       return 1;
    }
 
@@ -348,6 +369,7 @@ int main(int argc, char* argv[])
    const unsigned short forward_port = static_cast<unsigned short>(::atoi(argv[4]));
    const std::string local_host      = argv[1];
    const std::string forward_host    = argv[3];
+   debug = boost::lexical_cast<bool>(argv[5]);
 
    boost::asio::io_service ios;
 
