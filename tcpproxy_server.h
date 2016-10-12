@@ -88,7 +88,8 @@ namespace tcp_proxy
       boost::weak_ptr<bridge> session_;
       unsigned short upstream_port_;
       std::string upstream_host_;
-      uint64_t num_active_connections_;
    };
+   uint64_t num_server_connections_;
+   uint64_t num_client_connections_;
    std::vector<boost::shared_ptr<tcp_proxy::bridge> > bridge_instances;
 }

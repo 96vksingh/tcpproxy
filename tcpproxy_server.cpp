@@ -58,6 +58,8 @@ typedef ip::tcp::socket socket_type;
 using namespace tcp_proxy;
 
 //std::vector<boost::shared_ptr<tcp_proxy::bridge> > tcp_proxy::bridge_instances = std::vector<boost::shared_ptr<tcp_proxy::bridge> >();
+// uint64_t tcp_proxy::num_client_connections_ = 0;
+// uint64_t tcp_proxy::num_server_connections_ = 0;
 
 tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
 {
@@ -126,6 +128,8 @@ void tcp_proxy::client_splice::set_ss(boost::weak_ptr<server_splice> wssp)
 void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::error_code& error)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
+   num_client_connections_++;
+   std::cout << "Client Conn. " << num_client_connections_ << std::endl;
    boost::shared_ptr<bridge> bp = wbp_.lock();
    if (!error)
    {
@@ -280,8 +284,7 @@ tcp_proxy::acceptor::acceptor(boost::asio::io_service& io_service,
      localhost_address(boost::asio::ip::address_v4::from_string(local_host)),
      acceptor_(io_service_,ip::tcp::endpoint(localhost_address,local_port)),
      upstream_port_(upstream_port),
-     upstream_host_(upstream_host),
-     num_active_connections_(0)
+     upstream_host_(upstream_host)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
 }
@@ -296,7 +299,7 @@ bool tcp_proxy::acceptor::accept_connections()
       bp->init(bp);
       session_ = bp;
       tcp_proxy::bridge_instances.push_back(bp);
-      std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
+      std::cout << "Waiting to accept connections" << std::endl;
       acceptor_.async_accept(bp->ssplice_ptr_->downstream_socket_,
                              boost::bind(&acceptor::handle_accept,
                                          this,
@@ -318,8 +321,8 @@ void tcp_proxy::acceptor::handle_accept(const boost::system::error_code& error)
    if (!error)
    {
       boost::shared_ptr<bridge> bp = session_.lock();
-      num_active_connections_++;
-      std::cout << "Accepted connection " << num_active_connections_ << std::endl;
+      num_server_connections_++;
+      std::cout << "Server Conn. " << num_server_connections_ << std::endl;
       bp->start(upstream_host_, upstream_port_);
 
       if (!accept_connections())
