@@ -57,19 +57,22 @@ namespace ip = boost::asio::ip;
 typedef ip::tcp::socket socket_type;
 using namespace tcp_proxy;
 
+//std::vector<boost::shared_ptr<tcp_proxy::bridge> > tcp_proxy::bridge_instances = std::vector<boost::shared_ptr<tcp_proxy::bridge> >();
+
 tcp_proxy::bridge::bridge(boost::asio::io_service& ios)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
    csplice_ptr_ = boost::shared_ptr<client_splice>(new client_splice(ios));
    ssplice_ptr_ = boost::shared_ptr<server_splice>(new server_splice(ios));
-   std::cout << "inited client and server splice " << __FUNCTION__ << std::endl;
+    std::cout << "inited client and server splice " << __FUNCTION__ << std::endl;
 }
 
-void tcp_proxy::bridge::init()
+void tcp_proxy::bridge::init(boost::shared_ptr<bridge> bp)
 {
+   boost::weak_ptr<bridge> wbp = bp;
    std::cout << "In " << __FUNCTION__ << std::endl;
-   csplice_ptr_->set_bridge(this);
-   ssplice_ptr_->set_bridge(this);
+   csplice_ptr_->set_bridge(wbp);
+   ssplice_ptr_->set_bridge(wbp);
 }
 
 void tcp_proxy::bridge::start(const std::string& upstream_host, unsigned short upstream_port)
@@ -90,26 +93,47 @@ void tcp_proxy::bridge::close()
    boost::mutex::scoped_lock lock(mutex_);
    ssplice_ptr_->close();
    csplice_ptr_->close();
+
+   /* Iterate ande delete the current bridge instance from the bridge_isntance list */
+   for(auto it = bridge_instances.begin();
+       it != bridge_instances.end(); ++it)
+   {
+      if((*it).get() == this) {
+         bridge_instances.erase(it);
+      }
+   }
 }
 
 tcp_proxy::client_splice::client_splice(boost::asio::io_service& ios)
-   :upstream_socket_(ios),
-    bridge_ptr_(NULL)
+   :upstream_socket_(ios)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
 }
 
-void tcp_proxy::client_splice::set_bridge(bridge *bptr)
+void tcp_proxy::client_splice::set_bridge(boost::weak_ptr<bridge> wbp)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
-   bridge_ptr_ = bptr;
+   wbp_ = wbp;
 }
+
+void tcp_proxy::client_splice::set_ss(boost::weak_ptr<server_splice> wssp)
+{
+   std::cout << "In " << __FUNCTION__ << std::endl;
+   wssp_ = wssp;
+}
+
 
 void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::error_code& error)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
+   boost::shared_ptr<bridge> bp = wbp_.lock();
    if (!error)
    {
+      boost::weak_ptr<client_splice> wcsp = bp->csplice_ptr_;
+      boost::weak_ptr<server_splice> wssp = bp->ssplice_ptr_;
+      bp->csplice_ptr_->set_ss(wssp);
+      bp->ssplice_ptr_->set_cs(wcsp);
+
       upstream_socket_.async_read_some(
          boost::asio::buffer(upstream_data_,max_data_length),
          boost::bind(&client_splice::handle_upstream_read,
@@ -117,15 +141,15 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
 
-      bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
-         boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
+      bp->ssplice_ptr_->downstream_socket_.async_read_some(
+         boost::asio::buffer(bp->ssplice_ptr_->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                     bp->ssplice_ptr_->shared_from_this(),
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
       std::cerr << "Exception:" << error.message() << std::endl;
-      bridge_ptr_->close();
+      bp->close();
    }
 }
 void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_code& error)
@@ -133,15 +157,18 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      bridge_ptr_->ssplice_ptr_->downstream_socket_.async_read_some(
-         boost::asio::buffer(bridge_ptr_->ssplice_ptr_->downstream_data_,max_data_length),
+      boost::shared_ptr<server_splice> ssp = wssp_.lock();
+
+      ssp->downstream_socket_.async_read_some(
+         boost::asio::buffer(ssp->downstream_data_,max_data_length),
          boost::bind(&server_splice::handle_downstream_read,
-                     bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                     ssp->shared_from_this(),
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
+      boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bridge_ptr_->close();
+      bp->close();
    }
 }
 
@@ -151,14 +178,17 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      async_write(bridge_ptr_->ssplice_ptr_->downstream_socket_,
+      boost::shared_ptr<server_splice> ssp = wssp_.lock();
+
+      async_write(ssp->downstream_socket_,
                   boost::asio::buffer(upstream_data_,bytes_transferred),
                   boost::bind(&server_splice::handle_downstream_write,
-                              bridge_ptr_->ssplice_ptr_->shared_from_this(),
+                              ssp->shared_from_this(),
                               boost::asio::placeholders::error));
    } else {
+      boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bridge_ptr_->close();
+      bp->close();
    }
 }
 
@@ -178,10 +208,16 @@ tcp_proxy::server_splice::server_splice(boost::asio::io_service& ios)
    std::cout << "In " << __FUNCTION__ << std::endl;
 }
 
-void tcp_proxy::server_splice::set_bridge(bridge *bptr)
+void tcp_proxy::server_splice::set_bridge(boost::weak_ptr<bridge> wbp)
 {
    std::cout << "In " << __FUNCTION__ << std::endl;
-   bridge_ptr_ = bptr;
+   wbp_ = wbp;
+}
+
+void tcp_proxy::server_splice::set_cs(boost::weak_ptr<client_splice> wcsp)
+{
+   std::cout << "In " << __FUNCTION__ << std::endl;
+   wcsp_ = wcsp;
 }
 
 void tcp_proxy::server_splice::handle_downstream_write(const boost::system::error_code& error)
@@ -189,15 +225,18 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      bridge_ptr_->csplice_ptr_->upstream_socket_.async_read_some(
-         boost::asio::buffer(bridge_ptr_->csplice_ptr_->upstream_data_,max_data_length),
+      boost::shared_ptr<client_splice> csp = wcsp_.lock();
+
+      csp->upstream_socket_.async_read_some(
+         boost::asio::buffer(csp->upstream_data_,max_data_length),
          boost::bind(&client_splice::handle_upstream_read,
-                     bridge_ptr_->csplice_ptr_->shared_from_this(),
+                     csp->shared_from_this(),
                      boost::asio::placeholders::error,
                      boost::asio::placeholders::bytes_transferred));
    } else {
+      boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bridge_ptr_->close();
+      bp->close();
    }
 }
 
@@ -207,14 +246,17 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
-      async_write(bridge_ptr_->csplice_ptr_->upstream_socket_,
+      boost::shared_ptr<client_splice> csp = wcsp_.lock();
+
+      async_write(csp->upstream_socket_,
                   boost::asio::buffer(downstream_data_,bytes_transferred),
                   boost::bind(&client_splice::handle_upstream_write,
-                              bridge_ptr_->csplice_ptr_->shared_from_this(),
+                              csp->shared_from_this(),
                               boost::asio::placeholders::error));
    } else {
+      boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bridge_ptr_->close();
+      bp->close();
    }
 }
 
@@ -250,10 +292,12 @@ bool tcp_proxy::acceptor::accept_connections()
 
    try
    {
-      session_ = boost::shared_ptr<bridge>(new bridge(io_service_));
-      session_->init();
+      boost::shared_ptr<bridge> bp = boost::shared_ptr<bridge>(new bridge(io_service_));
+      bp->init(bp);
+      session_ = bp;
+      tcp_proxy::bridge_instances.push_back(bp);
       std::cout << __FUNCTION__ << "Waiting to accept connections" << std::endl;
-      acceptor_.async_accept(session_->ssplice_ptr_->downstream_socket_,
+      acceptor_.async_accept(bp->ssplice_ptr_->downstream_socket_,
                              boost::bind(&acceptor::handle_accept,
                                          this,
                                          boost::asio::placeholders::error));
@@ -273,9 +317,10 @@ void tcp_proxy::acceptor::handle_accept(const boost::system::error_code& error)
    std::cout << "In " << __FUNCTION__ << std::endl;
    if (!error)
    {
+      boost::shared_ptr<bridge> bp = session_.lock();
       num_active_connections_++;
       std::cout << "Accepted connection " << num_active_connections_ << std::endl;
-      session_->start(upstream_host_,upstream_port_);
+      bp->start(upstream_host_, upstream_port_);
 
       if (!accept_connections())
       {
