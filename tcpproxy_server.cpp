@@ -162,7 +162,11 @@ void tcp_proxy::client_splice::handle_upstream_connect(const boost::system::erro
                      boost::asio::placeholders::bytes_transferred));
    } else {
       std::cerr << "Exception:" << error.message() << std::endl;
-      bp->close();
+      if(bp) {
+         bp->close();
+      } else {
+         close();
+      }
    }
 }
 void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_code& error)
@@ -182,7 +186,11 @@ void tcp_proxy::client_splice::handle_upstream_write(const boost::system::error_
    } else {
       boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bp->close();
+      if(bp) {
+         bp->close();
+      } else {
+         close();
+      }
    }
 }
 
@@ -203,7 +211,11 @@ void tcp_proxy::client_splice::handle_upstream_read(const boost::system::error_c
    } else {
       boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bp->close();
+      if(bp) {
+         bp->close();
+      } else {
+         close();
+      }
    }
 }
 
@@ -256,7 +268,11 @@ void tcp_proxy::server_splice::handle_downstream_write(const boost::system::erro
    } else {
       boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bp->close();
+      if(bp) {
+         bp->close();
+      } else {
+         close();
+      }
    }
 }
 
@@ -277,7 +293,11 @@ void tcp_proxy::server_splice::handle_downstream_read(const boost::system::error
    } else {
       boost::shared_ptr<bridge> bp = wbp_.lock();
       std::cerr << "Exception:" << error.message() << std::endl;
-      bp->close();
+      if(bp) {
+         bp->close();
+      } else {
+         close();
+      }
    }
 }
 
