@@ -1,45 +1,32 @@
-//
-// tcpproxy_server.cpp
-// ~~~~~~~~~~~~~~~~~~~
-//
-// Copyright (c) 2007 Arash Partow (http://www.partow.net)
-// URL: http://www.partow.net/programming/tcpproxy/index.html
-//
-// Distributed under the Boost Software License, Version 1.0.
-//
-//
-// Description
-// ~~~~~~~~~~~
-// The objective of the TCP proxy server is to act as an intermediary
-// in order to 'forward' TCP based connections from external clients
-// onto a singular remote server.
-// The communication flow in the direction from the client to the proxy
-// to the server is called the upstream flow, and the communication flow
-// in the direction from the server to the proxy to the client is called
-// the downstream flow. Furthermore the up and down stream connections
-// are consolidated into a single concept known as a bridge.
-// In the event either the downstream or upstream end points disconnect,
-// the proxy server will proceed to disconnect the other end point
-// and eventually destroy the associated bridge.
-//
-// The following is a flow and structural diagram depicting the
-// various elements (proxy, server and client) and how they connect
-// and interact with each other.
-//
-//                                    ---> upstream --->           +---------------+
-//                                                     +---->------>               |
-//                               +-----------+         |           | Remote Server |
-//                     +--------->          [x]--->----+  +---<---[x]              |
-//                     |         | TCP Proxy |            |        +---------------+
-// +-----------+       |  +--<--[x] Server   <-----<------+
-// |          [x]--->--+  |      +-----------+
-// |  Client   |          |
-// |           <-----<----+
-// +-----------+
-//                <--- downstream <---
-//
-//
-
+/*
+ * Description
+ * ~~~~~~~~~~~
+ * The objective of the TCP proxy server is to act as an intermediary
+ * in order to 'forward' TCP based connections from external clients
+ * onto a singular remote server.
+ * The communication flow in the direction from the client to the proxy
+ * to the server is called the upstream flow, and the communication flow
+ * in the direction from the server to the proxy to the client is called
+ * the downstream flow. Furthermore the up and down stream connections
+ * are consolidated into a single concept known as a bridge.
+ * In the event either the downstream or upstream end points disconnect,
+ * the proxy server will proceed to disconnect the other end point
+ * and eventually destroy the associated bridge.
+ * The following is a flow and structural diagram depicting the
+ * various elements (proxy, server and client) and how they connect
+ * and interact with each other.
+                                   ---> upstream --->           +---------------+
+                                                    +---->------>               |
+                              +-----------+         |           | Remote Server |
+                    +--------->          [x]--->----+  +---<---[x]              |
+                    |         | TCP Proxy |            |        +---------------+
++-----------+       |  +--<--[x] Server   <-----<------+
+|          [x]--->--+  |      +-----------+
+|  Client   |          |
+|           <-----<----+
++-----------+
+               <--- downstream <---
+*/
 
 #include <cstdlib>
 #include <cstddef>
@@ -411,8 +398,3 @@ int main(int argc, char* argv[])
 
    return 0;
 }
-
-/*
- * [Note] On posix systems the tcp proxy server build command is as follows:
- * c++ -pedantic -ansi -Wall -Werror -O3 -o tcpproxy_server tcpproxy_server.cpp -L/usr/lib -lstdc++ -lpthread -lboost_thread -lboost_system
- */

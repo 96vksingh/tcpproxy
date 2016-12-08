@@ -1,3 +1,7 @@
+// Copyright (c) 2007 Arash Partow (http://www.partow.net)
+// URL: http://www.partow.net/programming/tcpproxy/index.html
+//
+// Distributed under the Boost Software License, Version 1.0.
 #include <cstdlib>
 #include <cstddef>
 #include <iostream>
