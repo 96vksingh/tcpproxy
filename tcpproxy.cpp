@@ -39,7 +39,7 @@
 #include <boost/asio.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/lexical_cast.hpp>
-#include "tcpproxy_server.h"
+#include "tcpproxy.h"
 
 namespace ip = boost::asio::ip;
 typedef ip::tcp::socket socket_type;

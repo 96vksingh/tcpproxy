@@ -1,29 +1,18 @@
-#
-# TCP Proxy Server
-# ~~~~~~~~~~~~~~~~~~~
-#
-# Copyright (c) 2007 Arash Partow (http://www.partow.net)
-# URL: http://www.partow.net/programming/tcpproxy/index.html
-#
-# Distributed under the Boost Software License, Version 1.0.
-#
-
-
 COMPILER         = $(CXX)
 OPTIMIZATION_OPT = -O0
 OPTIONS          = -pedantic -ansi -Wall -Werror $(OPTIMIZATION_OPT) -g -std=c++11
 PTHREAD          = -lpthread
 LINKER_OPT       = -lstdc++ $(PTHREAD) -lboost_thread -lboost_system
 
-BUILD_LIST+=tcpproxy_server
+BUILD_LIST+=tcpproxy
 
 all: $(BUILD_LIST)
 
-tcpproxy_server: tcpproxy_server.cpp
-	$(COMPILER) $(OPTIONS) $(EXTA_CFLAGS) -o tcpproxy_server tcpproxy_server.cpp $(LINKER_OPT)
+tcpproxy: tcpproxy.cpp
+	$(COMPILER) $(OPTIONS) $(EXTA_CFLAGS) -o tcpproxy tcpproxy.cpp $(LINKER_OPT)
 
 strip_bin :
 	strip -s tcpproxy
 
 clean:
-	rm -f tcpproxy_server core *.o *.bak *~ *stackdump *#
+	rm -f tcpproxy core *.o *.bak *~ *stackdump *#
